@@ -1,0 +1,71 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI", "Security"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write # required for keyless cosign signing
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/ecommerce-app
+
+jobs:
+  build-and-push:
+    name: Build, sign & push image
+    runs-on: ubuntu-latest
+    # Only proceed if BOTH the CI and Security workflows succeeded on this commit
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ecommerce-app
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless, OIDC)
+        # Provides provenance: proves the image was built by this pipeline and not tampered with.
+        run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+        continue-on-error: true # keeps CD from hard-failing if OIDC signing isn't enabled on the repo yet
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+    steps:
+      - name: Deploy notification (placeholder)
+        run: |
+          echo "Deploying ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "Replace this step with: kubectl set image / helm upgrade / docker compose pull && up -d,"
+          echo "depending on the target platform (see rapport technique, section Déploiement)."

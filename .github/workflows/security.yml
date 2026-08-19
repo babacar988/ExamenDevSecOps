@@ -1,0 +1,90 @@
+name: Security
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Weekly scan so newly-disclosed CVEs are caught even without new commits
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------
+  # SAST: static analysis of the application source code
+  # ---------------------------------------------------------------------
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
+
+  # ---------------------------------------------------------------------
+  # Secret scanning: catch committed API keys, tokens, passwords
+  # ---------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------
+  # SCA: known-vulnerable dependency scan (npm packages)
+  # ---------------------------------------------------------------------
+  dependency-scan:
+    name: Dependency scan (npm audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ecommerce-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      # Fails the build on high/critical vulnerabilities; moderate+ are still visible in the log.
+      - run: npm audit --audit-level=high
+
+  # ---------------------------------------------------------------------
+  # Container image scan: build the image once, scan it, only push if clean
+  # ---------------------------------------------------------------------
+  container-scan:
+    name: Container image scan (Trivy)
+    runs-on: ubuntu-latest
+    needs: [codeql, secret-scan, dependency-scan]
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (local only, not pushed yet)
+        run: docker build -t ecommerce-app:scan ./ecommerce-app
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ecommerce-app:scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1" # fail the pipeline if critical/high CVEs are found
+      - name: Upload Trivy results to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif

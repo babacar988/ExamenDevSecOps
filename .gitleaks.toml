@@ -1,0 +1,14 @@
+title = "gitleaks config - ecommerce-app"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives"
+regexes = [
+  # Public demo credentials documented at https://fakestoreapi.com/docs — not a real secret.
+  '''83r5\^_''',
+]
+paths = [
+  '''src/pages/Login.jsx''',
+]
