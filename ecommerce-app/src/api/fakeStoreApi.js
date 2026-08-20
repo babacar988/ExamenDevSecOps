@@ -42,3 +42,24 @@ export async function getCategories() {
   const { data } = await apiClient.get("/products/categories");
   return data;
 }
+
+/**
+ * Register a new account via POST /users.
+ * Fake Store API doesn't persist data for real, but it validates the payload
+ * shape and returns a generated id, which is enough to demonstrate a real
+ * sign-up flow end to end.
+ */
+export async function registerUser({ email, username, password }) {
+  const { data } = await apiClient.post("/users", {
+    email,
+    username,
+    password,
+    name: { firstname: username, lastname: "" },
+    address: {
+      city: "", street: "", number: 0, zipcode: "",
+      geolocation: { lat: "0", long: "0" },
+    },
+    phone: "",
+  });
+  return data;
+}

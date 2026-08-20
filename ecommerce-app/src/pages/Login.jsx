@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -10,6 +10,7 @@ export default function Login() {
   const location = useLocation();
 
   const from = location.state?.from?.pathname || "/";
+  const justRegistered = location.state?.registered;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,6 +22,11 @@ export default function Login() {
     <div className="login-page">
       <form className="login-form" onSubmit={handleSubmit}>
         <h2>Connexion</h2>
+        {justRegistered && (
+          <p className="success" role="status">
+            Compte créé avec succès. Vous pouvez vous connecter.
+          </p>
+        )}
         <p className="hint">
           Identifiants de démonstration Fake Store API pré-remplis.
         </p>
@@ -45,6 +51,9 @@ export default function Login() {
         <button type="submit" disabled={loading}>
           {loading ? "Connexion..." : "Se connecter"}
         </button>
+        <p className="hint">
+          Pas encore de compte ? <Link to="/register">S'inscrire</Link>
+        </p>
       </form>
     </div>
   );

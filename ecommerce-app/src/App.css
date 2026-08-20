@@ -183,6 +183,15 @@ body {
   font-size: 0.85rem;
 }
 
+.success {
+  color: var(--primary-dark);
+  background: var(--card-bg);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
