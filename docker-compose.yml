@@ -15,9 +15,12 @@ services:
       retries: 3
     read_only: true # container filesystem is immutable at runtime (defense in depth)
     tmpfs:
+      # /var/log/nginx is deliberately NOT mounted here: the base image ships
+      # access.log/error.log as symlinks to /dev/stdout /dev/stderr (docker
+      # logs picks them up). Mounting tmpfs there would replace those
+      # symlinks with an empty writable dir and break logging.
       - /var/cache/nginx
       - /var/run
-      - /var/log/nginx
       - /tmp
     networks:
       - app-net
