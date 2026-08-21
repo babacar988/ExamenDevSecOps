@@ -15,6 +15,7 @@ RUN npm run build
 # ---- Stage 2: runtime ----
 # Distroless-style minimal nginx image; no shell/package manager needed at runtime.
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
 
 # Copy hardened nginx config (no server_tokens, security headers, gzip, SPA fallback)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
