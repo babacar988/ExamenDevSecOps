@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # ---- Stage 2: runtime ----
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
 
 # Passage temporaire en root pour la mise à jour des paquets Alpine
 USER root
