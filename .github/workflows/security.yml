@@ -2,20 +2,16 @@ name: Security
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   schedule:
-    # Weekly scan so newly-disclosed CVEs are caught even without new commits
     - cron: "0 3 * * 1"
 
 permissions:
   contents: read
 
 jobs:
-  # ---------------------------------------------------------------------
-  # SAST: static analysis of the application source code
-  # ---------------------------------------------------------------------
   codeql:
     name: SAST (CodeQL)
     runs-on: ubuntu-latest
@@ -29,9 +25,6 @@ jobs:
           languages: javascript-typescript
       - uses: github/codeql-action/analyze@v3
 
-  # ---------------------------------------------------------------------
-  # Secret scanning: catch committed API keys, tokens, passwords
-  # ---------------------------------------------------------------------
   secret-scan:
     name: Secret scan (Gitleaks)
     runs-on: ubuntu-latest
@@ -43,9 +36,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ---------------------------------------------------------------------
-  # SCA: known-vulnerable dependency scan (npm packages)
-  # ---------------------------------------------------------------------
   dependency-scan:
     name: Dependency scan (npm audit)
     runs-on: ubuntu-latest
@@ -58,12 +48,8 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci
-      # Fails the build on high/critical vulnerabilities; moderate+ are still visible in the log.
       - run: npm audit --audit-level=high
 
-  # ---------------------------------------------------------------------
-  # Container image scan: build the image once, scan it, only push if clean
-  # ---------------------------------------------------------------------
   container-scan:
     name: Container image scan (Trivy)
     runs-on: ubuntu-latest
@@ -73,21 +59,10 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - name: Build image (local only, not pushed yet)
+      - name: Build image (local only)
         run: docker build -t ecommerce-app:scan ./ecommerce-app
-      - name: Scan image with Trivy (full report, non-blocking)
-        # Pinned to a commit SHA (not a mutable tag): aquasecurity/trivy-action
-        # was targeted by a supply-chain attack in 2025, after which the
-        # project moved to signed, immutable v-prefixed releases. Pinning by
-        # SHA means this step always runs the exact, audited code below,
-        # regardless of what a tag might later be made to point to.
-        # SHA corresponds to release v0.36.0.
-        #
-        # This first pass reports EVERY CRITICAL/HIGH finding (including OS
-        # packages in the Alpine base image with no fix available yet) to the
-        # GitHub Security tab for visibility, but never fails the build on
-        # its own — see the gating pass below for what actually blocks CI.
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      - name: Scan image with Trivy (SARIF report)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: ecommerce-app:scan
           format: sarif
@@ -95,21 +70,14 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "0"
 
-      - name: Upload Trivy results to GitHub Security tab
-        if: always()
+      - name: Upload Trivy results
+        if: ${{ always() }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
 
-      - name: "Scan image with Trivy (gate: fixable CRITICAL only)"
-        # This second pass is what actually blocks the pipeline. It is
-        # intentionally narrower than the report above:
-        #   - severity CRITICAL only — HIGH is common and mostly unavoidable
-        #     noise on Alpine base images (see rapport technique, section 8).
-        #   - ignore-unfixed: true — don't fail the build over a CVE with no
-        #     patch available yet; there is nothing actionable to do about it
-        #     today, and it would leave the pipeline permanently red.
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      - name: "Scan image with Trivy (Gate: CRITICAL fixable)"
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: ecommerce-app:scan
           format: table

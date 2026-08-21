@@ -2,9 +2,9 @@ name: CI/CD & Security Pipeline
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
   schedule:
     # Scan hebdomadaire des vulnérabilités
     - cron: "0 3 * * 1"
