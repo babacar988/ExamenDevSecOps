@@ -17,7 +17,7 @@ jobs:
     # Déclenche le job uniquement si le workflow parent s'est terminé avec succès
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Configuration de Buildx pour éviter l'erreur de cache
       - name: Set up Docker Buildx
