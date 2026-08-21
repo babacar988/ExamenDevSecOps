@@ -3,7 +3,7 @@ name: CD
 on:
   workflow_run:
     workflows: ["CI", "Security"]
-    branches: [master]
+    branches: [main]
     types: [completed]
 
 permissions:
